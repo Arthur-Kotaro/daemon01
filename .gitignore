@@ -1,0 +1,23 @@
+
+# Build
+/build/
+/cmake-build-*/
+
+# IDE
+/.idea/
+/.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Binaries
+*.exe
+*.dll
+*.so
+*.dylib
+*.o
+*.obj
+
+# Logs
+*.log
