@@ -1,0 +1,62 @@
+if(NOT EXISTS "@CMAKE_CURRENT_BINARY_DIR@/install_manifest.txt")
+  message(FATAL_ERROR "Cannot find install manifest: @CMAKE_CURRENT_BINARY_DIR@/install_manifest.txt")
+endif()
+
+# 1. Удалить все файлы из манифеста
+file(READ "@CMAKE_CURRENT_BINARY_DIR@/install_manifest.txt" files)
+string(REGEX REPLACE "\n" ";" files "${files}")
+
+foreach(file ${files})
+  set(full_file "$ENV{DESTDIR}${file}")
+  message(STATUS "Uninstalling: ${full_file}")
+  if(EXISTS "${full_file}")
+    execute_process(COMMAND @CMAKE_COMMAND@ -E remove "${full_file}")
+  else()
+    message(STATUS "File ${full_file} does not exist.")
+  endif()
+endforeach()
+
+# 2. Собрать все уникальные родительские каталоги
+set(dirs "")
+foreach(file ${files})
+  set(full_file "$ENV{DESTDIR}${file}")
+  get_filename_component(dir "${full_file}" DIRECTORY)
+  list(APPEND dirs "${dir}")
+endforeach()
+list(REMOVE_DUPLICATES dirs)
+
+# 3. Отсортировать каталоги по глубине (числу слэшей) в порядке убывания
+#    (чтобы сначала удалять самые глубокие каталоги)
+set(depth_pairs "")
+foreach(dir ${dirs})
+  string(REGEX MATCHALL "/" slash_matches "${dir}")
+  list(LENGTH slash_matches depth)
+  list(APPEND depth_pairs "${depth};${dir}")
+endforeach()
+
+# Сортировка числовая (требуется CMake ≥ 3.15)
+if(${CMAKE_VERSION} VERSION_GREATER_EQUAL "3.15.0")
+  list(SORT depth_pairs COMPARE NATURAL)
+else()
+  list(SORT depth_pairs) # лексикографическая сортировка (работает приближённо)
+endif()
+list(REVERSE depth_pairs) # от большей глубины к меньшей
+
+# Извлечь только пути каталогов
+set(sorted_dirs "")
+foreach(pair ${depth_pairs})
+  string(REGEX REPLACE "^[0-9]+;" "" dir "${pair}")
+  list(APPEND sorted_dirs "${dir}")
+endforeach()
+
+# 4. Удалить пустые каталоги
+foreach(dir ${sorted_dirs})
+  if(EXISTS "${dir}")
+    message(STATUS "Removing directory: ${dir}")
+    # Для Unix (Linux/macOS) — rmdir удаляет только пустой каталог
+    execute_process(COMMAND rmdir "${dir}" RESULT_VARIABLE result ERROR_QUIET)
+    if(NOT result EQUAL 0)
+      message(STATUS "Directory ${dir} not empty or cannot be removed.")
+    endif()
+  endif()
+endforeach()

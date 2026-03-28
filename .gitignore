@@ -6,6 +6,7 @@
 # IDE
 /.idea/
 /.vscode/
+*.clang*
 
 # OS
 .DS_Store
